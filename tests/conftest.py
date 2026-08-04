@@ -72,9 +72,11 @@ class SenderSpy:
 
     def __init__(self) -> None:
         self.sent: list[tuple[int, str]] = []
+        self.task_ids: list[int] = []
 
-    async def send(self, *, user_id: int, text: str) -> None:
+    async def send(self, *, user_id: int, text: str, task_id: int) -> None:
         self.sent.append((user_id, text))
+        self.task_ids.append(task_id)
 
 
 class PlannerSpy:
@@ -110,6 +112,19 @@ def make_handler(task_service: TaskService) -> Callable[[LLMClient], MessageHand
     return build
 
 
+class CallbackSpy:
+    """Stands in for an aiogram CallbackQuery pressed by the owner."""
+
+    def __init__(self, data: str, user_id: int = OWNER_ID) -> None:
+        self.data = data
+        self.from_user = type("User", (), {"id": user_id})()
+        self.message = MessageSpy(user_id)
+        self.answers: list[str | None] = []
+
+    async def answer(self, text: str | None = None) -> None:
+        self.answers.append(text)
+
+
 class MessageSpy:
     """Stands in for an aiogram Message: records what the user would have seen."""
 
@@ -117,6 +132,12 @@ class MessageSpy:
         self.from_user = type("User", (), {"id": user_id})()
         self.text = text
         self.answers: list[str] = []
+        self.edits: list[str] = []
 
     async def answer(self, text: str) -> None:
         self.answers.append(text)
+
+    async def edit_text(self, text: str) -> None:
+        # Telegram drops the keyboard when the text is replaced without one.
+        self.edits.append(text)
+        self.text = text

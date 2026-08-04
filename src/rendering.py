@@ -10,6 +10,19 @@ EMPTY_LIST_TEXT = "Список пуст."
 NO_DUE_DATE_TEXT = "Без срока."
 
 
+ALREADY_CLOSED_TEXT = "Эта задача уже закрыта."
+TASK_NOT_FOUND_TEXT = "Такой задачи нет."
+
+
+def render_task_completed(task: Task) -> str:
+    return f"Завершено: «{task.title}»"
+
+
+def render_task_snoozed(task: Task, timezone: ZoneInfo) -> str:
+    assert task.due_at is not None
+    return f"Отложено: «{task.title}»\nНапомню {task.due_at.astimezone(timezone):%d.%m в %H:%M}."
+
+
 def render_reminder(task: Task, *, late: bool = False) -> str:
     prefix = "Напоминание (с опозданием)" if late else "Напоминание"
     return f"{prefix}: «{task.title}»"

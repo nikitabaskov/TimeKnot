@@ -44,7 +44,7 @@ class ReminderService:
             for task in await tasks.list_due(now):
                 text = render_reminder(task, late=now - task.due_at > LATE_AFTER)
                 try:
-                    await self._sender.send(user_id=task.user_id, text=text)
+                    await self._sender.send(user_id=task.user_id, text=text, task_id=task.id)
                 except Exception:
                     # One unreachable chat must not hold up the rest. The task stays
                     # unmarked and goes out on the next dispatch or after a restart.

@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import enum
+from datetime import datetime, timedelta
 
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from clock import Clock
 from reminders import NullReminderPlanner, ReminderPlanner
-from repositories.models import Task
+from repositories.models import Task, TaskStatus
 from repositories.tasks import TaskRepository
 from repositories.users import UserRepository
+
+# Fixed by decision: v1 offers no choice of interval.
+SNOOZE_STEP = timedelta(hours=1)
+
+
+class Outcome(enum.StrEnum):
+    UPDATED = "updated"
+    ALREADY_CLOSED = "already_closed"
+    NOT_FOUND = "not_found"
 
 
 class TaskService:
@@ -63,3 +73,43 @@ class TaskService:
             tasks = await TaskRepository(session).list_pending(user_id)
             await session.commit()
             return tasks
+
+    async def complete(self, task_id: int, user_id: int) -> tuple[Outcome, Task | None]:
+        """Close a task. Pressing the button twice is a no-op, not an error."""
+        async with self._session_factory() as session:
+            task = await self._own_pending_task(session, task_id, user_id)
+            if not isinstance(task, Task):
+                return task, None
+            task.status = TaskStatus.DONE
+            await session.commit()
+            return Outcome.UPDATED, task
+
+    async def snooze(self, task_id: int, user_id: int) -> tuple[Outcome, Task | None]:
+        """Push a reminder one hour out and re-arm its timer."""
+        async with self._session_factory() as session:
+            task = await self._own_pending_task(session, task_id, user_id)
+            if not isinstance(task, Task):
+                return task, None
+
+            # Measured from the later of the two: after downtime a caught-up
+            # reminder can be hours overdue, and "again in an hour" must mean an
+            # hour from now, not an hour from a moment already past.
+            base = max(task.due_at or self._clock.now(), self._clock.now())
+            task.due_at = base + SNOOZE_STEP
+            # Cleared, or dispatch_due would consider this reminder already delivered.
+            task.reminder_sent_at = None
+            await session.commit()
+            due_at = task.due_at
+
+        self._planner.schedule(task_id, due_at)
+        return Outcome.UPDATED, task
+
+    async def _own_pending_task(
+        self, session: AsyncSession, task_id: int, user_id: int
+    ) -> Task | Outcome:
+        task = await TaskRepository(session).get(task_id)
+        if task is None or task.user_id != user_id:
+            return Outcome.NOT_FOUND
+        if task.status is not TaskStatus.PENDING:
+            return Outcome.ALREADY_CLOSED
+        return task

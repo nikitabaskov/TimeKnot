@@ -130,7 +130,7 @@ async def test_a_failed_send_leaves_the_task_unmarked(
     """At-least-once: a task is marked sent only after the send succeeded."""
 
     class BrokenSender:
-        async def send(self, *, user_id: int, text: str) -> None:
+        async def send(self, *, user_id: int, text: str, task_id: int) -> None:
             raise RuntimeError("Telegram is down")
 
     task_id = await store_task(session_factory)
@@ -151,7 +151,7 @@ async def test_one_broken_send_does_not_block_the_others(
         def __init__(self) -> None:
             self.sent: list[str] = []
 
-        async def send(self, *, user_id: int, text: str) -> None:
+        async def send(self, *, user_id: int, text: str, task_id: int) -> None:
             if "раньше" in text:
                 raise RuntimeError("Telegram is down")
             self.sent.append(text)

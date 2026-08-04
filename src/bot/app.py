@@ -8,7 +8,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from bot import handlers
+from bot import callbacks, handlers
 from bot.filters import OwnerOnly
 from bot.sender import TelegramSender
 from clock import Clock, SystemClock
@@ -36,6 +36,7 @@ def build_dispatcher(
     dispatcher["clock"] = clock
     dispatcher["timezone"] = ZoneInfo(config.timezone)
     dispatcher.include_router(handlers.router)
+    dispatcher.include_router(callbacks.router)
     return dispatcher
 
 

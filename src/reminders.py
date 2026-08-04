@@ -11,8 +11,12 @@ from typing import Protocol
 
 
 class ReminderSender(Protocol):
-    async def send(self, *, user_id: int, text: str) -> None:
-        """Deliver a reminder. Raises on failure so the task is not marked sent."""
+    async def send(self, *, user_id: int, text: str, task_id: int) -> None:
+        """Deliver a reminder. Raises on failure so the task is not marked sent.
+
+        The task id travels with the message so the transport can attach its own
+        controls without `services` knowing what a Telegram keyboard is.
+        """
         ...
 
 
