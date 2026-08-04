@@ -119,8 +119,8 @@ async def test_overdue_tasks_go_out_oldest_first(
     sent = await reminder_service.dispatch_due(AFTER_DUE + timedelta(hours=1))
 
     assert [reminder.text for reminder in sent] == [
-        "Напоминание: «раньше»",
-        "Напоминание: «позже»",
+        "Напоминание (с опозданием): «раньше»",
+        "Напоминание (с опозданием): «позже»",
     ]
 
 
@@ -164,8 +164,8 @@ async def test_one_broken_send_does_not_block_the_others(
         AFTER_DUE + timedelta(hours=1)
     )
 
-    assert [reminder.text for reminder in sent] == ["Напоминание: «позже»"]
-    assert sender.sent == ["Напоминание: «позже»"]
+    assert [reminder.text for reminder in sent] == ["Напоминание (с опозданием): «позже»"]
+    assert sender.sent == ["Напоминание (с опозданием): «позже»"]
 
 
 async def test_creating_a_dated_task_arms_a_timer(

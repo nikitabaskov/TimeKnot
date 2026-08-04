@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from reminders import ReminderSender
 from rendering import render_reminder
+from repositories.models import Task
 from repositories.tasks import TaskRepository
 
 logger = logging.getLogger(__name__)
+
+# A reminder that goes out this far past its moment is announced as late. Normal
+# firing is a fraction of a second off; only a catch-up after downtime is not.
+LATE_AFTER = timedelta(minutes=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +42,7 @@ class ReminderService:
         async with self._session_factory() as session:
             tasks = TaskRepository(session)
             for task in await tasks.list_due(now):
-                text = render_reminder(task)
+                text = render_reminder(task, late=now - task.due_at > LATE_AFTER)
                 try:
                     await self._sender.send(user_id=task.user_id, text=text)
                 except Exception:
@@ -49,3 +54,8 @@ class ReminderService:
                 await session.commit()
                 sent.append(SentReminder(task_id=task.id, user_id=task.user_id, text=text))
         return sent
+
+    async def list_upcoming(self, now: datetime) -> list[Task]:
+        """Open tasks still ahead of `now`, so their timers can be armed on startup."""
+        async with self._session_factory() as session:
+            return await TaskRepository(session).list_upcoming(now)

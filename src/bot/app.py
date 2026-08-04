@@ -71,6 +71,7 @@ async def run_polling(config: Config) -> None:
 
     dispatcher = build_dispatcher(config, task_service, message_handler, clock)
     scheduler.start()
+    await scheduler.rehydrate()
     try:
         await dispatcher.start_polling(bot)
     finally:

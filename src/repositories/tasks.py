@@ -41,6 +41,20 @@ class TaskRepository:
         result = await self._session.scalars(statement)
         return list(result)
 
+    async def list_upcoming(self, now: datetime) -> list[Task]:
+        """Open tasks whose moment is still ahead — the ones a timer must be armed for."""
+        statement = (
+            select(Task)
+            .where(
+                Task.status == TaskStatus.PENDING,
+                Task.due_at.is_not(None),
+                Task.due_at > now,
+            )
+            .order_by(Task.due_at, Task.id)
+        )
+        result = await self._session.scalars(statement)
+        return list(result)
+
     async def mark_reminder_sent(self, task: Task, at: datetime) -> None:
         task.reminder_sent_at = at
         await self._session.flush()

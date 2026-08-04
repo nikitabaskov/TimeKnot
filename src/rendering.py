@@ -10,8 +10,9 @@ EMPTY_LIST_TEXT = "Список пуст."
 NO_DUE_DATE_TEXT = "Без срока."
 
 
-def render_reminder(task: Task) -> str:
-    return f"Напоминание: «{task.title}»"
+def render_reminder(task: Task, *, late: bool = False) -> str:
+    prefix = "Напоминание (с опозданием)" if late else "Напоминание"
+    return f"{prefix}: «{task.title}»"
 
 
 def render_task_created(task: Task, timezone: ZoneInfo) -> str:

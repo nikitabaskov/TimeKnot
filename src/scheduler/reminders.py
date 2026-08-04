@@ -52,6 +52,21 @@ class ReminderScheduler:
             replace_existing=True,
         )
 
+    async def rehydrate(self) -> None:
+        """Rebuild the timer cache from the tasks table after a restart.
+
+        Overdue reminders go out at once — announced as late — and everything
+        still ahead gets a fresh job. Tasks already delivered are filtered out by
+        `reminder_sent_at`, so restarting twice does not resend anything.
+        """
+        now = self._clock.now()
+        caught_up = await self._reminder_service.dispatch_due(now)
+        upcoming = await self._reminder_service.list_upcoming(now)
+        for task in upcoming:
+            assert task.due_at is not None
+            self.schedule(task.id, task.due_at)
+        logger.info("Rehydrated: %d caught up, %d armed", len(caught_up), len(upcoming))
+
     async def _fire(self, scheduled_for: datetime) -> None:
         # The timer may fire a hair early; taking the later of the two moments
         # keeps the task inside the `due_at <= now` window it was armed for.
