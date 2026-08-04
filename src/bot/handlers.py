@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 from aiogram import Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
+
+from bot.rendering import render_task_list
+from services.tasks import TaskService
 
 router = Router(name="commands")
 
@@ -26,3 +31,9 @@ START_TEXT = (
 @router.message(CommandStart())
 async def handle_start(message: Message) -> None:
     await message.answer(START_TEXT)
+
+
+@router.message(Command("tasks"))
+async def handle_tasks(message: Message, task_service: TaskService, timezone: ZoneInfo) -> None:
+    tasks = await task_service.list_active(message.from_user.id)
+    await message.answer(render_task_list(tasks, timezone))

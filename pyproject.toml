@@ -5,6 +5,8 @@ description = "Personal Russian-language Telegram task and reminder assistant"
 requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.15",
+    "aiosqlite>=0.22.1",
+    "sqlalchemy[asyncio]>=2.0",
 ]
 
 [project.scripts]

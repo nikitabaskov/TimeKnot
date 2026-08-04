@@ -2,13 +2,13 @@
 
 ## Project status
 
-**Ticket 01 done** — skeleton, config loader, whitelist filter, `/start`, 9 tests green.
-Next unblocked ticket: `02` (task storage + empty `/tasks`).
+**Tickets 01–02 done** — skeleton, config loader, whitelist filter, `/start`, SQLite storage
+(`users` + `tasks`), `/tasks`. 24 tests green. Next unblocked ticket: `03` (graph seam).
 
 The product is a single-user Russian-language Telegram task/reminder assistant. The spec and a
 12-ticket breakdown live at `.scratch/telegram-task-assistant/`; read `spec.md` before writing
 code. Everything below the "Tech stack" heading that is not yet backed by code (LangGraph, LLM,
-APScheduler, SQLAlchemy, Jupytext) is still the *intended* setup — update it as tickets land.
+APScheduler, Jupytext) is still the *intended* setup — update it as tickets land.
 
 Run locally: `uv run --env-file .env python -m bot` (see `.env.example`).
 

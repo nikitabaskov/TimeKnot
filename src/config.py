@@ -5,6 +5,11 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+DEFAULT_TIMEZONE = "Asia/Krasnoyarsk"
+DEFAULT_DATABASE_PATH = "timeknot.db"
 
 
 class ConfigError(Exception):
@@ -15,6 +20,8 @@ class ConfigError(Exception):
 class Config:
     telegram_bot_token: str
     owner_user_ids: frozenset[int]
+    timezone: str
+    database_path: Path
 
 
 def load_config(env: Mapping[str, str] | None = None) -> Config:
@@ -53,4 +60,20 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
             "OWNER_USER_IDS is empty after parsing; at least one user id is required."
         )
 
-    return Config(telegram_bot_token=token, owner_user_ids=frozenset(owner_user_ids))
+    timezone = source.get("TIMEZONE", "").strip() or DEFAULT_TIMEZONE
+    try:
+        ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ConfigError(
+            f"TIMEZONE is set to {timezone!r}, which is not an IANA timezone name. "
+            f"Expected something like {DEFAULT_TIMEZONE}."
+        ) from None
+
+    database_path = source.get("DATABASE_PATH", "").strip() or DEFAULT_DATABASE_PATH
+
+    return Config(
+        telegram_bot_token=token,
+        owner_user_ids=frozenset(owner_user_ids),
+        timezone=timezone,
+        database_path=Path(database_path),
+    )

@@ -2,20 +2,27 @@
 
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot import handlers
 from bot.filters import OwnerOnly
+from clock import SystemClock
 from config import Config
+from repositories.database import build_engine, build_session_factory, create_schema
+from services.tasks import TaskService
 
 
-def build_dispatcher(config: Config) -> Dispatcher:
+def build_dispatcher(config: Config, task_service: TaskService) -> Dispatcher:
     dispatcher = Dispatcher()
     owner_only = OwnerOnly(config.owner_user_ids)
     dispatcher.message.filter(owner_only)
     dispatcher.callback_query.filter(owner_only)
+    dispatcher["task_service"] = task_service
+    dispatcher["timezone"] = ZoneInfo(config.timezone)
     dispatcher.include_router(handlers.router)
     return dispatcher
 
@@ -28,9 +35,18 @@ def build_bot(config: Config) -> Bot:
 
 
 async def run_polling(config: Config) -> None:
+    engine = build_engine(config.database_path)
+    await create_schema(engine)
+    task_service = TaskService(
+        session_factory=build_session_factory(engine),
+        clock=SystemClock(),
+        default_timezone=config.timezone,
+    )
+
     bot = build_bot(config)
-    dispatcher = build_dispatcher(config)
+    dispatcher = build_dispatcher(config, task_service)
     try:
         await dispatcher.start_polling(bot)
     finally:
         await bot.session.close()
+        await engine.dispose()
