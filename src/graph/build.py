@@ -25,8 +25,8 @@ def build_message_graph(
     builder.add_node(PARSE_NODE, nodes.make_parse_node(llm, timezone))
     builder.add_node(nodes.CLARIFY_ROUTE, nodes.make_clarify_node(llm, timezone))
     builder.add_node("create_task", nodes.make_create_task_node(task_service, timezone))
-    builder.add_node("list_tasks", nodes.list_tasks)
-    builder.add_node("complete_task", nodes.complete_task)
+    builder.add_node("list_tasks", nodes.make_list_tasks_node(task_service, timezone))
+    builder.add_node("complete_task", nodes.make_complete_task_node(task_service))
     builder.add_node("smalltalk", nodes.smalltalk)
     builder.add_node("unparsed", nodes.unparsed)
 

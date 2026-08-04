@@ -12,12 +12,13 @@ from tests.conftest import NOW, OWNER_ID, FixedClock, MessageSpy
 
 
 async def test_handler_passes_the_message_through_the_seam(make_handler) -> None:
-    llm = ScriptedLLMClient([json.dumps({"intent": "smalltalk"})])
+    response = {"intent": "smalltalk", "smalltalk_reply": "Привет!"}
+    llm = ScriptedLLMClient([json.dumps(response)])
     message = MessageSpy()
 
     await handle_free_text(message, make_handler(llm), FixedClock())  # type: ignore[arg-type]
 
-    assert message.answers == ["[stub smalltalk]"]
+    assert message.answers == ["Привет!"]
     _system, user_prompt = llm.calls[0]
     assert user_prompt == "test message"
 

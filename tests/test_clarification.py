@@ -133,12 +133,13 @@ async def test_the_owner_can_walk_away_from_the_question(
     task_service: TaskService, checkpointer: object, session: AsyncSession
 ) -> None:
     """Answering with something unrelated follows the new message, it does not trap."""
-    handler = build(scripted(AMBIGUOUS, {"intent": "smalltalk"}), task_service, checkpointer)
+    smalltalk = {"intent": "smalltalk", "smalltalk_reply": "Пожалуйста!"}
+    handler = build(scripted(AMBIGUOUS, smalltalk), task_service, checkpointer)
     await say(handler, "напомни позвонить маме в 5")
 
     reply = await say(handler, "спасибо")
 
-    assert "smalltalk" in reply
+    assert reply == "Пожалуйста!"
     assert await TaskRepository(session).list_pending(OWNER_ID) == []
 
 

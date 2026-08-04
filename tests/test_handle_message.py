@@ -14,9 +14,14 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graph.llm import LLMClient, LLMError, ScriptedLLMClient
-from graph.nodes import LLM_UNAVAILABLE_REPLY, NO_TITLE_REPLY, UNPARSED_REPLY
+from graph.nodes import (
+    DEFAULT_SMALLTALK_REPLY,
+    LLM_UNAVAILABLE_REPLY,
+    NO_TITLE_REPLY,
+    UNPARSED_REPLY,
+)
 from graph.runner import MessageHandler
-from rendering import render_task_list
+from rendering import EMPTY_LIST_TEXT, NOTHING_TO_CLOSE_TEXT, render_task_list
 from repositories.models import TaskStatus
 from repositories.tasks import TaskRepository
 from repositories.users import UserRepository
@@ -141,9 +146,9 @@ async def test_create_without_a_title_creates_nothing(
 @pytest.mark.parametrize(
     ("intent", "expected"),
     [
-        ("list_tasks", "list_tasks"),
-        ("complete_task", "complete_task"),
-        ("smalltalk", "smalltalk"),
+        ("list_tasks", EMPTY_LIST_TEXT),
+        ("complete_task", NOTHING_TO_CLOSE_TEXT),
+        ("smalltalk", DEFAULT_SMALLTALK_REPLY),
     ],
 )
 async def test_non_creating_intents_take_their_own_branch(
@@ -151,7 +156,7 @@ async def test_non_creating_intents_take_their_own_branch(
 ) -> None:
     reply = await reply_to(make_handler, "что угодно", scripted({"intent": intent}))
 
-    assert expected in reply
+    assert reply == expected
 
 
 @pytest.mark.parametrize("intent", ["list_tasks", "complete_task", "smalltalk"])

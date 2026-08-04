@@ -74,13 +74,18 @@ class TaskService:
             await session.commit()
             return tasks
 
-    async def complete(self, task_id: int, user_id: int) -> tuple[Outcome, Task | None]:
-        """Close a task. Pressing the button twice is a no-op, not an error."""
+    async def complete(
+        self,
+        task_id: int,
+        user_id: int,
+        status: TaskStatus = TaskStatus.DONE,
+    ) -> tuple[Outcome, Task | None]:
+        """Close a task as done or cancelled. Closing twice is a no-op, not an error."""
         async with self._session_factory() as session:
             task = await self._own_pending_task(session, task_id, user_id)
             if not isinstance(task, Task):
                 return task, None
-            task.status = TaskStatus.DONE
+            task.status = status
             await session.commit()
             return Outcome.UPDATED, task
 

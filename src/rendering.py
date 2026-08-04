@@ -14,8 +14,19 @@ ALREADY_CLOSED_TEXT = "Эта задача уже закрыта."
 TASK_NOT_FOUND_TEXT = "Такой задачи нет."
 
 
-def render_task_completed(task: Task) -> str:
-    return f"Завершено: «{task.title}»"
+NOTHING_TO_CLOSE_TEXT = "Не нашёл такой задачи среди активных. Посмотреть список — /tasks"
+CHOICE_NOT_UNDERSTOOD_TEXT = "Не понял, какую именно. Ничего не закрывал."
+
+
+def render_task_completed(task: Task, cancelled: bool = False) -> str:
+    return f"{'Отменено' if cancelled else 'Завершено'}: «{task.title}»"
+
+
+def render_completion_choice(tasks: list[Task]) -> str:
+    """Asks which one, numbered — several tasks matched and guessing is not allowed."""
+    lines = ["Какую именно закрыть?"]
+    lines += [f"{number}. {task.title}" for number, task in enumerate(tasks, start=1)]
+    return "\n".join(lines)
 
 
 def render_task_snoozed(task: Task, timezone: ZoneInfo) -> str:
