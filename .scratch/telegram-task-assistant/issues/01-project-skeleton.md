@@ -4,12 +4,21 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `uv sync`, `uv run pytest`, `uv run ruff check --fix . && uv run ruff format .` отрабатывают на чистом клоне
-- [ ] Бот поднимается в режиме long polling, токен и whitelist берутся из переменных окружения
-- [ ] `/start` отвечает текстом с описанием возможностей
-- [ ] Сообщение от `user_id` вне whitelist отбрасывается молча, до любой другой обработки
-- [ ] Отсутствие обязательной переменной окружения роняет запуск с внятным сообщением, а не с трейсбеком по `KeyError`
-- [ ] Есть тест на фильтр whitelist: разрешённый и запрещённый `user_id`
-- [ ] Слои `bot` / `graph` / `services` / `repositories` заведены как пакеты, зависимости направлены строго внутрь
+- [x] `uv sync`, `uv run pytest`, `uv run ruff check --fix . && uv run ruff format .` отрабатывают на чистом клоне
+- [x] Бот поднимается в режиме long polling, токен и whitelist берутся из переменных окружения
+- [x] `/start` отвечает текстом с описанием возможностей
+- [x] Сообщение от `user_id` вне whitelist отбрасывается молча, до любой другой обработки
+- [x] Отсутствие обязательной переменной окружения роняет запуск с внятным сообщением, а не с трейсбеком по `KeyError`
+- [x] Есть тест на фильтр whitelist: разрешённый и запрещённый `user_id`
+- [x] Слои `bot` / `graph` / `services` / `repositories` заведены как пакеты, зависимости направлены строго внутрь
+
+## Comments
+
+Implemented in `6822691`.
+
+- `.env` is not read by the application; use `uv run --env-file .env python -m bot` locally and
+  a systemd `EnvironmentFile` on the VPS. Keeps the dependency list free of `python-dotenv`.
+- The whitelist is a root filter on the dispatcher (`dispatcher.message.filter`), which aiogram
+  checks before any router or handler filter — strangers never reach a handler.
