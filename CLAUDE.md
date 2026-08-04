@@ -5,7 +5,7 @@
 **Tickets 01–09 done** — skeleton, config, whitelist, `/start`, SQLite storage, `/tasks`, the
 `handle_message` seam over a LangGraph state graph, live extraction through OpenRouter with real
 task creation, the `dispatch_due` seam firing reminders through APScheduler, rehydration of the
-timer cache on startup, the two reminder buttons, and the clarifying dialog persisted in
+timer cache on startup, the two reminder buttons, the clarifying dialog persisted in
 `AsyncSqliteSaver`, and the list / complete / smalltalk branches. 107 tests green. Next unblocked
 ticket: `10` (parsing resilience).
 
