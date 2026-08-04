@@ -57,6 +57,20 @@ async def test_task_with_a_deadline_is_stored_in_utc(
     assert "05.08 в 19:00" in reply, "the confirmation shows local time"
 
 
+async def test_creating_a_dated_task_arms_a_timer(make_handler: Handlers, planner) -> None:
+    llm = scripted(
+        {"intent": "create_task", "title": "Проверить PR", "due_at": "2026-08-05T19:00:00+07:00"},
+        {"intent": "create_task", "title": "Почитать книгу", "due_at": None},
+    )
+
+    await reply_to(make_handler, "напомни проверить PR завтра в 19", llm)
+    await reply_to(make_handler, "почитать книгу", llm)
+
+    assert [due_at for _task_id, due_at in planner.scheduled] == [
+        datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
+    ], "an undated task never reaches the scheduler"
+
+
 async def test_task_without_a_time_gets_no_deadline(
     make_handler: Handlers, session: AsyncSession
 ) -> None:

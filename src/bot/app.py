@@ -10,11 +10,14 @@ from aiogram.enums import ParseMode
 
 from bot import handlers
 from bot.filters import OwnerOnly
+from bot.sender import TelegramSender
 from clock import Clock, SystemClock
 from config import Config
 from graph.openrouter import OpenRouterClient
 from graph.runner import MessageHandler
 from repositories.database import build_engine, build_session_factory, create_schema
+from scheduler.reminders import ReminderScheduler
+from services.reminders import ReminderService
 from services.tasks import TaskService
 
 
@@ -48,10 +51,16 @@ async def run_polling(config: Config) -> None:
     await create_schema(engine)
     clock = SystemClock()
     timezone = ZoneInfo(config.timezone)
+    session_factory = build_session_factory(engine)
+
+    bot = build_bot(config)
+    reminder_service = ReminderService(session_factory, TelegramSender(bot))
+    scheduler = ReminderScheduler(reminder_service, clock)
     task_service = TaskService(
-        session_factory=build_session_factory(engine),
+        session_factory=session_factory,
         clock=clock,
         default_timezone=config.timezone,
+        planner=scheduler,
     )
     llm = OpenRouterClient(
         api_key=config.openrouter_api_key,
@@ -60,11 +69,12 @@ async def run_polling(config: Config) -> None:
     )
     message_handler = MessageHandler(llm, task_service, timezone)
 
-    bot = build_bot(config)
     dispatcher = build_dispatcher(config, task_service, message_handler, clock)
+    scheduler.start()
     try:
         await dispatcher.start_polling(bot)
     finally:
+        scheduler.shutdown()
         await bot.session.close()
         await llm.aclose()
         await engine.dispose()

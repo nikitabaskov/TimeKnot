@@ -10,6 +10,10 @@ EMPTY_LIST_TEXT = "Список пуст."
 NO_DUE_DATE_TEXT = "Без срока."
 
 
+def render_reminder(task: Task) -> str:
+    return f"Напоминание: «{task.title}»"
+
+
 def render_task_created(task: Task, timezone: ZoneInfo) -> str:
     """Confirmation. Shows what was understood so a misreading is caught immediately."""
     when = (

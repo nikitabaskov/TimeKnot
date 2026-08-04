@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from clock import Clock
+from reminders import NullReminderPlanner, ReminderPlanner
 from repositories.models import Task
 from repositories.tasks import TaskRepository
 from repositories.users import UserRepository
@@ -18,10 +19,12 @@ class TaskService:
         session_factory: async_sessionmaker,
         clock: Clock,
         default_timezone: str,
+        planner: ReminderPlanner | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._clock = clock
         self._default_timezone = default_timezone
+        self._planner = planner or NullReminderPlanner()
 
     async def create_task(
         self,
@@ -45,7 +48,12 @@ class TaskService:
                 )
             )
             await session.commit()
-            return task
+
+        # Armed after the commit: a timer for a task that failed to store would
+        # fire against nothing. A task without a deadline never reaches the scheduler.
+        if task.due_at is not None:
+            self._planner.schedule(task.id, task.due_at)
+        return task
 
     async def list_active(self, user_id: int) -> list[Task]:
         """Pending tasks of the user. Creates the user row on first contact."""

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from graph.llm import LLMClient
 from graph.runner import MessageHandler
 from repositories.database import build_engine, build_session_factory, create_schema
+from services.reminders import ReminderService
 from services.tasks import TaskService
 
 OWNER_ID = 111
@@ -55,8 +56,48 @@ async def session(session_factory: async_sessionmaker) -> AsyncIterator[AsyncSes
 
 
 @pytest.fixture
-def task_service(session_factory: async_sessionmaker, clock: FixedClock) -> TaskService:
-    return TaskService(session_factory=session_factory, clock=clock, default_timezone=TIMEZONE)
+def task_service(
+    session_factory: async_sessionmaker, clock: FixedClock, planner: PlannerSpy
+) -> TaskService:
+    return TaskService(
+        session_factory=session_factory,
+        clock=clock,
+        default_timezone=TIMEZONE,
+        planner=planner,
+    )
+
+
+class SenderSpy:
+    """Collects what would have gone out to Telegram."""
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[int, str]] = []
+
+    async def send(self, *, user_id: int, text: str) -> None:
+        self.sent.append((user_id, text))
+
+
+class PlannerSpy:
+    def __init__(self) -> None:
+        self.scheduled: list[tuple[int, datetime]] = []
+
+    def schedule(self, task_id: int, due_at: datetime) -> None:
+        self.scheduled.append((task_id, due_at))
+
+
+@pytest.fixture
+def sender() -> SenderSpy:
+    return SenderSpy()
+
+
+@pytest.fixture
+def planner() -> PlannerSpy:
+    return PlannerSpy()
+
+
+@pytest.fixture
+def reminder_service(session_factory: async_sessionmaker, sender: SenderSpy) -> ReminderService:
+    return ReminderService(session_factory, sender)
 
 
 @pytest.fixture
