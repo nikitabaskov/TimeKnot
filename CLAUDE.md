@@ -2,13 +2,14 @@
 
 ## Project status
 
-**Tickets 01–03 done** — skeleton, config loader, whitelist filter, `/start`, SQLite storage
-(`users` + `tasks`), `/tasks`, and the `handle_message` seam over a LangGraph state graph that
-branches on intent. 42 tests green. Next unblocked ticket: `04` (real LLM extraction).
+**Tickets 01–04 done** — skeleton, config, whitelist, `/start`, SQLite storage, `/tasks`, the
+`handle_message` seam over a LangGraph state graph, and live extraction through OpenRouter with
+real task creation. 46 tests green. Next unblocked tickets: `05` (reminder dispatch) and
+`10` (parsing resilience).
 
-The graph's four intent nodes are deliberate stubs (`[stub …]` replies) — ticket 04 fills in
-`create_task`, ticket 09 the rest. The LLM client is a protocol with a scripted fake; there is
-no real provider yet, so the running bot answers stubs to free text.
+`list_tasks`, `complete_task` and `smalltalk` are still stub nodes (`[stub …]` replies) —
+ticket 09 fills them in. Running the bot now needs `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`.
+Tests never touch the network: they drive `handle_message` with `ScriptedLLMClient`.
 
 The product is a single-user Russian-language Telegram task/reminder assistant. The spec and a
 12-ticket breakdown live at `.scratch/telegram-task-assistant/`; read `spec.md` before writing

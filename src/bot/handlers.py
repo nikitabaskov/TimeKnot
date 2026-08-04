@@ -8,9 +8,9 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
-from bot.rendering import render_task_list
 from clock import Clock
 from graph.runner import MessageHandler
+from rendering import render_task_list
 from services.tasks import TaskService
 
 router = Router(name="commands")

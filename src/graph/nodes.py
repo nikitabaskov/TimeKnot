@@ -1,44 +1,39 @@
 """Graph nodes.
 
-Only the parse node is real in this ticket. The four intent nodes are stubs:
-ticket 04 fills in task creation, ticket 09 the list, complete and smalltalk
-branches. They exist now so the branching itself can be tested.
+`parse` and `create_task` are real. The other three intent branches are still
+stubs — ticket 09 fills in list, complete and smalltalk.
 """
 
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 from pydantic import ValidationError
 
+from graph.extract import extract
 from graph.llm import LLMClient, LLMError
-from graph.schemas import Intent, ParsedMessage
+from graph.schemas import Intent
 from graph.state import DialogState, StateUpdate
-
-# Expanded in ticket 04, where the local date, time and weekday are added.
-SYSTEM_PROMPT = (
-    "Ты разбираешь сообщения пользователя русскоязычного ассистента задач. "
-    "Верни JSON с полями intent (create_task, list_tasks, complete_task, smalltalk), "
-    "title, category, due_at."
-)
+from rendering import render_task_created
+from services.tasks import TaskService
 
 UNPARSED_REPLY = "Не смог разобрать сообщение. Попробуй сформулировать иначе."
 LLM_UNAVAILABLE_REPLY = "Сейчас не могу обработать сообщение — модель недоступна. Попробуй позже."
+NO_TITLE_REPLY = "Не понял, что именно записать. Попробуй сформулировать иначе."
 
 UNPARSED_ROUTE = "unparsed"
 
 
-def make_parse_node(llm: LLMClient):
-    """The node closes over the LLM client; LangGraph only ever passes `state`."""
+def make_parse_node(llm: LLMClient, timezone: ZoneInfo):
+    """The node closes over its dependencies; LangGraph only ever passes `state`."""
 
     async def parse(state: DialogState) -> StateUpdate:
         try:
-            raw = await llm.complete(system=SYSTEM_PROMPT, user=state["text"])
+            parsed = await extract(llm, text=state["text"], now=state["now"], timezone=timezone)
         except LLMError:
             return {"parsed": None, "reply": LLM_UNAVAILABLE_REPLY}
-
-        try:
-            # Ticket 04 adds the single retry with the validation error appended.
-            parsed = ParsedMessage.model_validate_json(raw)
         except ValidationError:
+            # Ticket 10 adds the single retry with the validation error appended.
             return {"parsed": None, "reply": UNPARSED_REPLY}
 
         return {"parsed": parsed}
@@ -53,10 +48,22 @@ def route_by_intent(state: DialogState) -> str:
     return parsed.intent.value
 
 
-async def create_task(state: DialogState) -> StateUpdate:
-    parsed = state.get("parsed")
-    assert parsed is not None, "the create_task branch is only reachable with a parsed message"
-    return {"reply": f"[stub create_task] {parsed.title} / {parsed.due_at}"}
+def make_create_task_node(task_service: TaskService, timezone: ZoneInfo):
+    async def create_task(state: DialogState) -> StateUpdate:
+        parsed = state.get("parsed")
+        assert parsed is not None, "this branch is only reachable with a parsed message"
+        if not parsed.title:
+            return {"reply": NO_TITLE_REPLY}
+
+        task = await task_service.create_task(
+            state["user_id"],
+            title=parsed.title,
+            category=parsed.category,
+            due_at=parsed.due_at,
+        )
+        return {"reply": render_task_created(task, timezone)}
+
+    return create_task
 
 
 async def list_tasks(state: DialogState) -> StateUpdate:

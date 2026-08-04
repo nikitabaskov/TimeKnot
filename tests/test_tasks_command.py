@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bot.handlers import handle_tasks
-from bot.rendering import EMPTY_LIST_TEXT
+from rendering import EMPTY_LIST_TEXT
 from repositories.models import Task
 from repositories.tasks import TaskRepository
 from repositories.users import UserRepository

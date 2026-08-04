@@ -6,18 +6,39 @@ from pathlib import Path
 
 import pytest
 
-from config import DEFAULT_DATABASE_PATH, DEFAULT_TIMEZONE, ConfigError, load_config
+from config import (
+    DEFAULT_DATABASE_PATH,
+    DEFAULT_OPENROUTER_BASE_URL,
+    DEFAULT_TIMEZONE,
+    ConfigError,
+    load_config,
+)
 
-VALID_ENV = {"TELEGRAM_BOT_TOKEN": "123:abc", "OWNER_USER_IDS": "111"}
+VALID_ENV = {
+    "TELEGRAM_BOT_TOKEN": "123:abc",
+    "OWNER_USER_IDS": "111",
+    "OPENROUTER_API_KEY": "sk-test",
+    "OPENROUTER_MODEL": "deepseek/deepseek-chat",
+}
 
 
 def test_loads_token_and_owners() -> None:
-    config = load_config({"TELEGRAM_BOT_TOKEN": "123:abc", "OWNER_USER_IDS": "111, 222"})
+    config = load_config({**VALID_ENV, "OWNER_USER_IDS": "111, 222"})
     assert config.telegram_bot_token == "123:abc"
     assert config.owner_user_ids == frozenset({111, 222})
 
 
-@pytest.mark.parametrize("missing", ["TELEGRAM_BOT_TOKEN", "OWNER_USER_IDS"])
+def test_loads_the_llm_settings() -> None:
+    config = load_config(VALID_ENV)
+    assert config.openrouter_api_key == "sk-test"
+    assert config.openrouter_model == "deepseek/deepseek-chat"
+    assert config.openrouter_base_url == DEFAULT_OPENROUTER_BASE_URL
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["TELEGRAM_BOT_TOKEN", "OWNER_USER_IDS", "OPENROUTER_API_KEY", "OPENROUTER_MODEL"],
+)
 def test_missing_variable_is_reported_by_name(missing: str) -> None:
     env = {key: value for key, value in VALID_ENV.items() if key != missing}
     with pytest.raises(ConfigError, match=missing):

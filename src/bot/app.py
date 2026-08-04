@@ -12,7 +12,7 @@ from bot import handlers
 from bot.filters import OwnerOnly
 from clock import Clock, SystemClock
 from config import Config
-from graph.llm import ScriptedLLMClient
+from graph.openrouter import OpenRouterClient
 from graph.runner import MessageHandler
 from repositories.database import build_engine, build_session_factory, create_schema
 from services.tasks import TaskService
@@ -47,13 +47,18 @@ async def run_polling(config: Config) -> None:
     engine = build_engine(config.database_path)
     await create_schema(engine)
     clock = SystemClock()
+    timezone = ZoneInfo(config.timezone)
     task_service = TaskService(
         session_factory=build_session_factory(engine),
         clock=clock,
         default_timezone=config.timezone,
     )
-    # Ticket 04 replaces this with the real OpenRouter client.
-    message_handler = MessageHandler(ScriptedLLMClient())
+    llm = OpenRouterClient(
+        api_key=config.openrouter_api_key,
+        model=config.openrouter_model,
+        base_url=config.openrouter_base_url,
+    )
+    message_handler = MessageHandler(llm, task_service, timezone)
 
     bot = build_bot(config)
     dispatcher = build_dispatcher(config, task_service, message_handler, clock)
@@ -61,4 +66,5 @@ async def run_polling(config: Config) -> None:
         await dispatcher.start_polling(bot)
     finally:
         await bot.session.close()
+        await llm.aclose()
         await engine.dispose()

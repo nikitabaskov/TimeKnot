@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 from langgraph.graph import END, START, StateGraph
 
 from graph import nodes
 from graph.llm import LLMClient
 from graph.state import DialogState
+from services.tasks import TaskService
 
 PARSE_NODE = "parse"
 
 
-def build_message_graph(llm: LLMClient):
+def build_message_graph(llm: LLMClient, task_service: TaskService, timezone: ZoneInfo):
     builder = StateGraph(DialogState)
-    builder.add_node(PARSE_NODE, nodes.make_parse_node(llm))
-    builder.add_node("create_task", nodes.create_task)
+    builder.add_node(PARSE_NODE, nodes.make_parse_node(llm, timezone))
+    builder.add_node("create_task", nodes.make_create_task_node(task_service, timezone))
     builder.add_node("list_tasks", nodes.list_tasks)
     builder.add_node("complete_task", nodes.complete_task)
     builder.add_node("smalltalk", nodes.smalltalk)

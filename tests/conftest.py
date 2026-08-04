@@ -2,18 +2,23 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from graph.llm import LLMClient
+from graph.runner import MessageHandler
 from repositories.database import build_engine, build_session_factory, create_schema
 from services.tasks import TaskService
 
 OWNER_ID = 111
 TIMEZONE = "Asia/Krasnoyarsk"
+KRASNOYARSK = ZoneInfo(TIMEZONE)
+# 2026-08-04 16:00 in Krasnoyarsk, a Tuesday.
 NOW = datetime(2026, 8, 4, 9, 0, tzinfo=UTC)
 
 
@@ -52,6 +57,16 @@ async def session(session_factory: async_sessionmaker) -> AsyncIterator[AsyncSes
 @pytest.fixture
 def task_service(session_factory: async_sessionmaker, clock: FixedClock) -> TaskService:
     return TaskService(session_factory=session_factory, clock=clock, default_timezone=TIMEZONE)
+
+
+@pytest.fixture
+def make_handler(task_service: TaskService) -> Callable[[LLMClient], MessageHandler]:
+    """Builds the seam over a given LLM double, on the real database."""
+
+    def build(llm: LLMClient) -> MessageHandler:
+        return MessageHandler(llm, task_service, KRASNOYARSK)
+
+    return build
 
 
 class MessageSpy:

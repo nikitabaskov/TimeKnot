@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 DEFAULT_TIMEZONE = "Asia/Krasnoyarsk"
 DEFAULT_DATABASE_PATH = "timeknot.db"
+DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class ConfigError(Exception):
@@ -22,6 +23,9 @@ class Config:
     owner_user_ids: frozenset[int]
     timezone: str
     database_path: Path
+    openrouter_api_key: str
+    openrouter_model: str
+    openrouter_base_url: str
 
 
 def load_config(env: Mapping[str, str] | None = None) -> Config:
@@ -71,9 +75,29 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
 
     database_path = source.get("DATABASE_PATH", "").strip() or DEFAULT_DATABASE_PATH
 
+    openrouter_api_key = source.get("OPENROUTER_API_KEY", "").strip()
+    if not openrouter_api_key:
+        raise ConfigError(
+            "OPENROUTER_API_KEY is not set. Create a key at openrouter.ai/keys and put it into "
+            "the environment (see .env.example)."
+        )
+
+    openrouter_model = source.get("OPENROUTER_MODEL", "").strip()
+    if not openrouter_model:
+        raise ConfigError(
+            "OPENROUTER_MODEL is not set. Pick a paid model id from openrouter.ai/models, "
+            "e.g. deepseek/deepseek-chat. Free `:free` variants have daily limits and get "
+            "withdrawn, which a reminder bot cannot rely on."
+        )
+
     return Config(
         telegram_bot_token=token,
         owner_user_ids=frozenset(owner_user_ids),
         timezone=timezone,
         database_path=Path(database_path),
+        openrouter_api_key=openrouter_api_key,
+        openrouter_model=openrouter_model,
+        openrouter_base_url=(
+            source.get("OPENROUTER_BASE_URL", "").strip() or DEFAULT_OPENROUTER_BASE_URL
+        ),
     )
