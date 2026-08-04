@@ -2,13 +2,19 @@
 
 ## Project status
 
-**Tickets 01–02 done** — skeleton, config loader, whitelist filter, `/start`, SQLite storage
-(`users` + `tasks`), `/tasks`. 24 tests green. Next unblocked ticket: `03` (graph seam).
+**Tickets 01–03 done** — skeleton, config loader, whitelist filter, `/start`, SQLite storage
+(`users` + `tasks`), `/tasks`, and the `handle_message` seam over a LangGraph state graph that
+branches on intent. 42 tests green. Next unblocked ticket: `04` (real LLM extraction).
+
+The graph's four intent nodes are deliberate stubs (`[stub …]` replies) — ticket 04 fills in
+`create_task`, ticket 09 the rest. The LLM client is a protocol with a scripted fake; there is
+no real provider yet, so the running bot answers stubs to free text.
 
 The product is a single-user Russian-language Telegram task/reminder assistant. The spec and a
 12-ticket breakdown live at `.scratch/telegram-task-assistant/`; read `spec.md` before writing
-code. Everything below the "Tech stack" heading that is not yet backed by code (LangGraph, LLM,
-APScheduler, Jupytext) is still the *intended* setup — update it as tickets land.
+code. Everything below the "Tech stack" heading that is not yet backed by code (OpenRouter,
+`AsyncSqliteSaver`, APScheduler, Jupytext) is still the *intended* setup — update it as tickets
+land.
 
 Run locally: `uv run --env-file .env python -m bot` (see `.env.example`).
 

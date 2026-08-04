@@ -57,8 +57,9 @@ def task_service(session_factory: async_sessionmaker, clock: FixedClock) -> Task
 class MessageSpy:
     """Stands in for an aiogram Message: records what the user would have seen."""
 
-    def __init__(self, user_id: int = OWNER_ID) -> None:
+    def __init__(self, user_id: int = OWNER_ID, text: str = "test message") -> None:
         self.from_user = type("User", (), {"id": user_id})()
+        self.text = text
         self.answers: list[str] = []
 
     async def answer(self, text: str) -> None:
