@@ -13,6 +13,7 @@ from bot.filters import OwnerOnly
 from bot.sender import TelegramSender
 from clock import Clock, SystemClock
 from config import Config
+from graph.checkpointer import open_checkpointer
 from graph.openrouter import OpenRouterClient
 from graph.runner import MessageHandler
 from repositories.database import build_engine, build_session_factory, create_schema
@@ -68,15 +69,16 @@ async def run_polling(config: Config) -> None:
         model=config.openrouter_model,
         base_url=config.openrouter_base_url,
     )
-    message_handler = MessageHandler(llm, task_service, timezone)
+    async with open_checkpointer(config.database_path) as checkpointer:
+        message_handler = MessageHandler(llm, task_service, timezone, checkpointer)
 
-    dispatcher = build_dispatcher(config, task_service, message_handler, clock)
-    scheduler.start()
-    await scheduler.rehydrate()
-    try:
-        await dispatcher.start_polling(bot)
-    finally:
-        scheduler.shutdown()
-        await bot.session.close()
-        await llm.aclose()
-        await engine.dispose()
+        dispatcher = build_dispatcher(config, task_service, message_handler, clock)
+        scheduler.start()
+        await scheduler.rehydrate()
+        try:
+            await dispatcher.start_polling(bot)
+        finally:
+            scheduler.shutdown()
+            await bot.session.close()
+            await llm.aclose()
+            await engine.dispose()

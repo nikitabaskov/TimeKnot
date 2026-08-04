@@ -16,6 +16,9 @@ class DialogState(TypedDict):
     now: datetime
     parsed: NotRequired[ParsedMessage | None]
     reply: NotRequired[str]
+    # Set once the owner has been asked a question about this message. Guarantees
+    # the second pass cannot ask again.
+    clarified: NotRequired[bool]
 
 
 class StateUpdate(TypedDict, total=False):
@@ -23,3 +26,4 @@ class StateUpdate(TypedDict, total=False):
 
     parsed: ParsedMessage | None
     reply: str
+    clarified: bool

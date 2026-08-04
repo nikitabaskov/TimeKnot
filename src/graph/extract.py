@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from graph.llm import LLMClient
-from graph.prompts import build_system_prompt
+from graph.prompts import build_clarification_prompt, build_system_prompt
 from graph.schemas import ParsedMessage
 
 
@@ -50,6 +50,32 @@ async def extract(
 ) -> ParsedMessage:
     """Raises LLMError on provider failure and ValidationError on unusable output."""
     system = build_system_prompt(now.astimezone(timezone))
-    raw = await llm.complete(system=system, user=text)
+    return await _complete_and_parse(llm, system=system, user=text, timezone=timezone)
+
+
+async def extract_after_clarification(
+    llm: LLMClient,
+    *,
+    original: str,
+    question: str,
+    answer: str,
+    now: datetime,
+    timezone: ZoneInfo,
+) -> ParsedMessage:
+    """Re-read the exchange once the owner has answered the question."""
+    system = build_clarification_prompt(
+        now.astimezone(timezone), original=original, question=question, answer=answer
+    )
+    parsed = await _complete_and_parse(llm, system=system, user=answer, timezone=timezone)
+    # One question per task: whatever the model says now, it does not get to ask again.
+    parsed.needs_clarification = False
+    parsed.clarification_question = None
+    return parsed
+
+
+async def _complete_and_parse(
+    llm: LLMClient, *, system: str, user: str, timezone: ZoneInfo
+) -> ParsedMessage:
+    raw = await llm.complete(system=system, user=user)
     parsed = ParsedMessage.model_validate_json(strip_code_fence(raw))
     return normalize_due_at(parsed, timezone)

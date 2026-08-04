@@ -2,11 +2,12 @@
 
 ## Project status
 
-**Tickets 01–07 done** — skeleton, config, whitelist, `/start`, SQLite storage, `/tasks`, the
+**Tickets 01–08 done** — skeleton, config, whitelist, `/start`, SQLite storage, `/tasks`, the
 `handle_message` seam over a LangGraph state graph, live extraction through OpenRouter with real
-task creation, the `dispatch_due` seam firing reminders through APScheduler, and rehydration of
-the timer cache on startup, and the two reminder buttons. 84 tests green. Next unblocked ticket:
-`10` (parsing resilience); `08` (clarification loop) is next in the numbered order.
+task creation, the `dispatch_due` seam firing reminders through APScheduler, rehydration of the
+timer cache on startup, the two reminder buttons, and the clarifying dialog persisted in
+`AsyncSqliteSaver`. 92 tests green. Next unblocked tickets: `09` (list and complete intents),
+`10` (parsing resilience).
 
 `list_tasks`, `complete_task` and `smalltalk` are still stub nodes (`[stub …]` replies) —
 ticket 09 fills them in. Running the bot now needs `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`.
