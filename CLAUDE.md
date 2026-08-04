@@ -2,13 +2,15 @@
 
 ## Project status
 
-**Design done, no code yet** — no source, no package manifest, no git repo. Run `git init`
-before any workflow that needs history.
+**Ticket 01 done** — skeleton, config loader, whitelist filter, `/start`, 9 tests green.
+Next unblocked ticket: `02` (task storage + empty `/tasks`).
 
 The product is a single-user Russian-language Telegram task/reminder assistant. The spec and a
 12-ticket breakdown live at `.scratch/telegram-task-assistant/`; read `spec.md` before writing
-code. Ticket `01` is the only unblocked one. Everything below the "Tech stack" heading is the
-*intended* setup — update it with real facts as soon as code lands.
+code. Everything below the "Tech stack" heading that is not yet backed by code (LangGraph, LLM,
+APScheduler, SQLAlchemy, Jupytext) is still the *intended* setup — update it as tickets land.
+
+Run locally: `uv run --env-file .env python -m bot` (see `.env.example`).
 
 ## Tech stack
 
