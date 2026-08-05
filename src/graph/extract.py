@@ -6,12 +6,24 @@ being judged. It knows nothing about the database or Telegram.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from pydantic import ValidationError
+
 from graph.llm import LLMClient
-from graph.prompts import build_clarification_prompt, build_system_prompt
+from graph.prompts import build_clarification_prompt, build_retry_note, build_system_prompt
 from graph.schemas import ParsedMessage
+
+MAX_HORIZON = timedelta(days=365)
+
+
+class DueDateRejected(Exception):
+    """A moment the code refuses to store: already gone, or absurdly far ahead."""
+
+    def __init__(self, *, past: bool) -> None:
+        super().__init__("due date in the past" if past else "due date beyond the horizon")
+        self.past = past
 
 
 def strip_code_fence(raw: str) -> str:
@@ -41,6 +53,20 @@ def normalize_due_at(parsed: ParsedMessage, timezone: ZoneInfo) -> ParsedMessage
     return parsed
 
 
+def ensure_due_at_is_usable(parsed: ParsedMessage, now: datetime) -> None:
+    """Schema validation only proves `due_at` is a date; this proves it is a deadline.
+
+    A moment that has already passed would be stored as a task nobody is ever
+    reminded of, and one a year out is a model slip, not an intention.
+    """
+    if parsed.due_at is None:
+        return
+    if parsed.due_at <= now:
+        raise DueDateRejected(past=True)
+    if parsed.due_at - now > MAX_HORIZON:
+        raise DueDateRejected(past=False)
+
+
 async def extract(
     llm: LLMClient,
     *,
@@ -50,7 +76,7 @@ async def extract(
 ) -> ParsedMessage:
     """Raises LLMError on provider failure and ValidationError on unusable output."""
     system = build_system_prompt(now.astimezone(timezone))
-    return await _complete_and_parse(llm, system=system, user=text, timezone=timezone)
+    return await _complete_and_parse(llm, system=system, user=text, now=now, timezone=timezone)
 
 
 async def extract_after_clarification(
@@ -66,7 +92,7 @@ async def extract_after_clarification(
     system = build_clarification_prompt(
         now.astimezone(timezone), original=original, question=question, answer=answer
     )
-    parsed = await _complete_and_parse(llm, system=system, user=answer, timezone=timezone)
+    parsed = await _complete_and_parse(llm, system=system, user=answer, now=now, timezone=timezone)
     # One question per task: whatever the model says now, it does not get to ask again.
     parsed.needs_clarification = False
     parsed.clarification_question = None
@@ -74,6 +100,24 @@ async def extract_after_clarification(
 
 
 async def _complete_and_parse(
+    llm: LLMClient, *, system: str, user: str, now: datetime, timezone: ZoneInfo
+) -> ParsedMessage:
+    try:
+        parsed = await _parse_once(llm, system=system, user=user, timezone=timezone)
+    except ValidationError as error:
+        # Exactly one retry, with the validator's own complaint handed back to the
+        # model. A second failure is the caller's to report — this is not a loop.
+        parsed = await _parse_once(
+            llm, system=system + build_retry_note(error), user=user, timezone=timezone
+        )
+
+    # Deliberately outside the retry: a date in the past is a well-formed answer
+    # to the wrong question, and the owner is told rather than the model re-asked.
+    ensure_due_at_is_usable(parsed, now)
+    return parsed
+
+
+async def _parse_once(
     llm: LLMClient, *, system: str, user: str, timezone: ZoneInfo
 ) -> ParsedMessage:
     raw = await llm.complete(system=system, user=user)

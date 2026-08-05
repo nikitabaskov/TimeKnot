@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+MAX_ERROR_CHARS = 400
+
 WEEKDAYS = (
     "понедельник",
     "вторник",
@@ -62,6 +64,14 @@ _CLARIFICATION_TEMPLATE = """\
 верни create_task с due_at = null.
 """
 
+_RETRY_TEMPLATE = """\
+
+Прошлый твой ответ не прошёл проверку:
+{error}
+
+Верни тот же смысл заново — один валидный JSON-объект по описанным выше полям, без пояснений.
+"""
+
 
 def build_system_prompt(local_now: datetime) -> str:
     """Build the system prompt for a given local moment."""
@@ -71,6 +81,15 @@ def build_system_prompt(local_now: datetime) -> str:
         weekday=WEEKDAYS[local_now.weekday()],
         offset=f"{offset[:3]}:{offset[3:]}",
     )
+
+
+def build_retry_note(error: Exception) -> str:
+    """The tail appended to the prompt for the single retry after a bad answer.
+
+    Pydantic lists every offending field, which is exactly the feedback the model
+    needs — trimmed, because a wall of errors buries the instruction that follows.
+    """
+    return _RETRY_TEMPLATE.format(error=str(error)[:MAX_ERROR_CHARS])
 
 
 def build_clarification_prompt(

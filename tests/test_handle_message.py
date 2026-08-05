@@ -181,7 +181,9 @@ async def test_task_fields_are_ignored_outside_create_task(
 
 
 async def test_unknown_intent_is_a_parse_failure(make_handler: Handlers) -> None:
-    reply = await reply_to(make_handler, "привет", scripted({"intent": "buy_me_a_beer"}))
+    unknown = {"intent": "buy_me_a_beer"}
+
+    reply = await reply_to(make_handler, "привет", scripted(unknown, unknown))
 
     assert reply == UNPARSED_REPLY
 
@@ -189,7 +191,7 @@ async def test_unknown_intent_is_a_parse_failure(make_handler: Handlers) -> None
 async def test_malformed_json_is_a_parse_failure(
     make_handler: Handlers, session: AsyncSession
 ) -> None:
-    reply = await reply_to(make_handler, "привет", ScriptedLLMClient(["не json вовсе"]))
+    reply = await reply_to(make_handler, "привет", ScriptedLLMClient(["не json", "тоже не json"]))
 
     assert reply == UNPARSED_REPLY
     assert await UserRepository(session).list_all() == [], "a failed parse touches nothing"

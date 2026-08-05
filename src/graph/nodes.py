@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from langgraph.types import interrupt
 from pydantic import ValidationError
 
-from graph.extract import extract, extract_after_clarification
+from graph.extract import DueDateRejected, extract, extract_after_clarification
 from graph.llm import LLMClient, LLMError
 from graph.schemas import Intent, Resolution
 from graph.state import DialogState, StateUpdate
@@ -26,6 +26,10 @@ from services.tasks import Outcome, TaskService
 UNPARSED_REPLY = "Не смог разобрать сообщение. Попробуй сформулировать иначе."
 LLM_UNAVAILABLE_REPLY = "Сейчас не могу обработать сообщение — модель недоступна. Попробуй позже."
 NO_TITLE_REPLY = "Не понял, что именно записать. Попробуй сформулировать иначе."
+DUE_IN_THE_PAST_REPLY = (
+    "Этот момент уже прошёл — напоминание не сработает. Назови время в будущем, и запишу."
+)
+DUE_TOO_FAR_REPLY = "Срок получился дальше года — похоже на ошибку. Назови дату поближе."
 TIME_STILL_UNCLEAR_NOTE = "Со временем так и не разобрался — записал без срока."
 DEFAULT_SMALLTALK_REPLY = "На связи. Напиши, что нужно сделать — запишу."
 
@@ -41,13 +45,19 @@ def make_parse_node(llm: LLMClient, timezone: ZoneInfo):
             parsed = await extract(llm, text=state["text"], now=state["now"], timezone=timezone)
         except LLMError:
             return {"parsed": None, "reply": LLM_UNAVAILABLE_REPLY}
+        except DueDateRejected as rejected:
+            return {"parsed": None, "reply": due_date_reply(rejected)}
         except ValidationError:
-            # Ticket 10 adds the single retry with the validation error appended.
+            # `extract` already spent its one retry; a second failure is honest news.
             return {"parsed": None, "reply": UNPARSED_REPLY}
 
         return {"parsed": parsed}
 
     return parse
+
+
+def due_date_reply(rejected: DueDateRejected) -> str:
+    return DUE_IN_THE_PAST_REPLY if rejected.past else DUE_TOO_FAR_REPLY
 
 
 def route_by_intent(state: DialogState) -> str:
@@ -79,6 +89,8 @@ def make_clarify_node(llm: LLMClient, timezone: ZoneInfo):
             )
         except LLMError:
             return {"parsed": None, "clarified": True, "reply": LLM_UNAVAILABLE_REPLY}
+        except DueDateRejected as rejected:
+            return {"parsed": None, "clarified": True, "reply": due_date_reply(rejected)}
         except ValidationError:
             return {"parsed": None, "clarified": True, "reply": UNPARSED_REPLY}
 

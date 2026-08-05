@@ -2,12 +2,13 @@
 
 ## Project status
 
-**Tickets 01–09 done** — skeleton, config, whitelist, `/start`, SQLite storage, `/tasks`, the
+**Tickets 01–10 done** — skeleton, config, whitelist, `/start`, SQLite storage, `/tasks`, the
 `handle_message` seam over a LangGraph state graph, live extraction through OpenRouter with real
 task creation, the `dispatch_due` seam firing reminders through APScheduler, rehydration of the
 timer cache on startup, the two reminder buttons, the clarifying dialog persisted in
-`AsyncSqliteSaver`, and the list / complete / smalltalk branches. 107 tests green. Next unblocked
-ticket: `10` (parsing resilience).
+`AsyncSqliteSaver`, the list / complete / smalltalk branches, and parsing resilience (one retry on
+`ValidationError`, `due_at` sanity checks, exponential backoff on the provider). 120 tests green.
+Next unblocked ticket: `11` (VPS deployment).
 
 Every graph branch is real now — no stubs left. Running the bot needs `OPENROUTER_API_KEY` and
 `OPENROUTER_MODEL`. Tests never touch the network: they drive `handle_message` with
