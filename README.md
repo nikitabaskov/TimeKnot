@@ -52,7 +52,17 @@ npx wrangler secret put TELEGRAM_BOT_TOKEN   # the same token the bot uses
 
 Between those two commands the Worker is up without its secret, which means `env.TELEGRAM_BOT_TOKEN`
 is `undefined`, no path can match it, and every request gets a `404`. The window is safe, not open.
-The secret takes effect as soon as it is set; no second deploy.
+
+**Give it a minute before believing a failure.** A deploy or a new secret reaches Cloudflare's edge
+over roughly half a minute, and not to every location at once — during that window the same request
+alternates between the old code and the new. A `404` right after `wrangler secret put` usually
+means the edge has not caught up, not that anything is wrong. Retry before debugging.
+
+To avoid a copy-paste mismatch, feed the secret straight from the file rather than the clipboard:
+
+```bash
+grep '^TELEGRAM_BOT_TOKEN=' ../../.env | cut -d= -f2- | npx wrangler secret put TELEGRAM_BOT_TOKEN
+```
 
 `wrangler deploy` prints the URL. Put its origin — scheme and host, no path — into the server
 environment:
@@ -73,6 +83,16 @@ Two things worth knowing:
 
 Cost is nil in practice: long polling holds one request open at a time, roughly 3k requests a day
 against a free-plan allowance of 100k.
+
+Check the relay end to end before pointing the bot at it:
+
+```bash
+TOKEN=$(grep '^TELEGRAM_BOT_TOKEN=' .env | cut -d= -f2-)
+curl -s "https://<your-worker>.workers.dev/bot$TOKEN/getMe"
+```
+
+`{"ok":true,…}` means the whole path works: your host reached Cloudflare, Cloudflare reached
+Telegram, and the token matched the secret.
 
 ## First deploy
 
