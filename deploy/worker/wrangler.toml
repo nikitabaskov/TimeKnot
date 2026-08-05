@@ -1,0 +1,11 @@
+name = "timeknot-telegram-relay"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# The token is a secret, never a var: set it with
+#   wrangler secret put TELEGRAM_BOT_TOKEN
+# so it is encrypted at rest and stays out of this file.
+
+# Long polling holds one request open at a time, so the free plan's 100k/day is
+# never in reach. No observability block: request URLs carry the bot token and
+# there is no reason to write them to a log.

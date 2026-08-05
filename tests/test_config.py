@@ -9,6 +9,7 @@ import pytest
 from config import (
     DEFAULT_DATABASE_PATH,
     DEFAULT_OPENROUTER_BASE_URL,
+    DEFAULT_TELEGRAM_API_ORIGIN,
     DEFAULT_TIMEZONE,
     ConfigError,
     load_config,
@@ -65,3 +66,25 @@ def test_timezone_and_database_path_are_overridable() -> None:
 def test_unknown_timezone_is_reported() -> None:
     with pytest.raises(ConfigError, match="TIMEZONE"):
         load_config({**VALID_ENV, "TIMEZONE": "Mars/Olympus"})
+
+
+def test_telegram_is_reached_directly_by_default() -> None:
+    assert load_config(VALID_ENV).telegram_api_origin == DEFAULT_TELEGRAM_API_ORIGIN
+
+
+def test_a_relay_origin_replaces_it() -> None:
+    config = load_config({**VALID_ENV, "TELEGRAM_API_ORIGIN": "https://relay.workers.dev"})
+
+    assert config.telegram_api_origin == "https://relay.workers.dev"
+
+
+def test_a_trailing_slash_on_the_origin_is_dropped() -> None:
+    """`from_base` joins with a slash of its own; two would 404 every call."""
+    config = load_config({**VALID_ENV, "TELEGRAM_API_ORIGIN": "https://relay.workers.dev/"})
+
+    assert config.telegram_api_origin == "https://relay.workers.dev"
+
+
+def test_an_origin_without_a_scheme_is_reported() -> None:
+    with pytest.raises(ConfigError, match="TELEGRAM_API_ORIGIN"):
+        load_config({**VALID_ENV, "TELEGRAM_API_ORIGIN": "relay.workers.dev"})

@@ -17,19 +17,58 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://api.telegram.org
 
 `200` (or `302`/`404` — anything but a connection error) means egress works and you can ignore the
 rest of this section. A hang or `Could not resolve host` / `Network is unreachable` means it does
-not. Three ways out, best first:
+not. Four ways out:
 
 1. **Buy an IPv4 address from the provider.** Usually a euro or two a month, and nothing else in
-   this document changes.
-2. **Use the provider's NAT64/DNS64**, if it has one. Many IPv6-only plans ship it and only need
+   this document changes. The boring answer, and the one with the fewest moving parts.
+2. **Put the Cloudflare Worker relay in front of Telegram** — see the next section. Free, entirely
+   under your own account, and the only thing it changes on the server is one environment
+   variable. This does not give the box general IPv4; it fixes Telegram specifically, which is the
+   only host that needs it at runtime.
+3. **Use the provider's NAT64/DNS64**, if it has one. Many IPv6-only plans ship it and only need
    the resolver set — ask support for the DNS64 address, then put it in
    `/etc/systemd/resolved.conf` (`DNS=…`) and `systemctl restart systemd-resolved`.
-3. **A public NAT64 resolver**, e.g. `2a01:4f9:c010:3f02::1` (nat64.net). Free and it works, but a
+4. **A public NAT64 resolver**, e.g. `2a01:4f9:c010:3f02::1` (nat64.net). Free and it works, but a
    stranger's box then sees which hosts you connect to. TLS keeps the token and the messages
    themselves private; treat this as a stopgap, not a setup.
 
 Everything else the deploy needs — PyPI, OpenRouter, the Debian/Ubuntu mirrors — is reachable over
-IPv6 already.
+IPv6 already. GitHub is not, so with options 2 and 4 the code goes to the server by `rsync`
+instead of `git clone` (last section).
+
+## The Telegram relay on Cloudflare Workers
+
+`deploy/worker/` is a ~40-line Worker that forwards `/bot<token>/<method>` and
+`/file/bot<token>/<path>` to `api.telegram.org` unchanged. Cloudflare is dual-stack, so the bot
+reaches the Worker over IPv6 and the Worker reaches Telegram over IPv4. aiogram treats it as an
+ordinary Bot API server, so long polling, sending and callbacks all work as before.
+
+```bash
+cd deploy/worker
+npx wrangler login
+npx wrangler secret put TELEGRAM_BOT_TOKEN   # the same token the bot uses
+npx wrangler deploy
+```
+
+`wrangler deploy` prints the URL. Put its origin — scheme and host, no path — into the server
+environment:
+
+```
+TELEGRAM_API_ORIGIN=https://timeknot-telegram-relay.<subdomain>.workers.dev
+```
+
+Leave it unset and the bot calls `api.telegram.org` directly, which is what you want anywhere with
+IPv4.
+
+Two things worth knowing:
+
+- **The relay is pinned to one token.** It compares the token in the path against the secret and
+  answers `404` to anything else, so it cannot be used as an open relay by whoever finds the URL.
+- **Do not turn on request logging for this Worker.** The bot token is part of every request path.
+  `wrangler.toml` deliberately has no observability block.
+
+Cost is nil in practice: long polling holds one request open at a time, roughly 3k requests a day
+against a free-plan allowance of 100k.
 
 ## First deploy
 

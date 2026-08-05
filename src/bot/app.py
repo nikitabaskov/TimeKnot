@@ -6,6 +6,8 @@ from zoneinfo import ZoneInfo
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
 from aiogram.enums import ParseMode
 
 from bot import callbacks, handlers
@@ -42,8 +44,12 @@ def build_dispatcher(
 
 
 def build_bot(config: Config) -> Bot:
+    # `from_base` turns an origin into both templates aiogram needs, so the relay
+    # is one setting rather than two format strings a typo can silently break.
+    session = AiohttpSession(api=TelegramAPIServer.from_base(config.telegram_api_origin))
     return Bot(
         token=config.telegram_bot_token,
+        session=session,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 

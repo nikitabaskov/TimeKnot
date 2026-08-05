@@ -10,8 +10,10 @@ timer cache on startup, the two reminder buttons, the clarifying dialog persiste
 `ValidationError`, `due_at` sanity checks, exponential backoff on the provider). 120 tests green.
 
 Ticket `11` (VPS deployment) is written but not verified: `deploy/timeknot.service`,
-`deploy/timeknot.env.example` and `README.md` are in place, the manual reboot check is still
-pending on the real machine. Next unblocked ticket: `12` (golden set eval).
+`deploy/timeknot.env.example`, `deploy/worker/` and `README.md` are in place, the manual reboot
+check is still pending on the real machine. The target VPS has no IPv4 and `api.telegram.org` has
+no AAAA record, so the Bot API is reached through a Cloudflare Worker relay selected by
+`TELEGRAM_API_ORIGIN`. Next unblocked ticket: `12` (golden set eval).
 
 Every graph branch is real now — no stubs left. Running the bot needs `OPENROUTER_API_KEY` and
 `OPENROUTER_MODEL`. Tests never touch the network: they drive `handle_message` with

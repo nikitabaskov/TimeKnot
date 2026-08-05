@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 DEFAULT_TIMEZONE = "Asia/Krasnoyarsk"
 DEFAULT_DATABASE_PATH = "timeknot.db"
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_TELEGRAM_API_ORIGIN = "https://api.telegram.org"
 
 
 class ConfigError(Exception):
@@ -20,6 +21,7 @@ class ConfigError(Exception):
 @dataclass(frozen=True, slots=True)
 class Config:
     telegram_bot_token: str
+    telegram_api_origin: str
     owner_user_ids: frozenset[int]
     timezone: str
     database_path: Path
@@ -38,6 +40,17 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
             "TELEGRAM_BOT_TOKEN is not set. Put the token from @BotFather into the environment "
             "(see .env.example)."
         )
+
+    # Everything Telegram is reached through this origin. It exists because
+    # api.telegram.org has no AAAA record: an IPv6-only host needs a dual-stack
+    # relay in front of it. See deploy/worker/ and the README.
+    api_origin = source.get("TELEGRAM_API_ORIGIN", "").strip() or DEFAULT_TELEGRAM_API_ORIGIN
+    if not api_origin.startswith(("http://", "https://")):
+        raise ConfigError(
+            f"TELEGRAM_API_ORIGIN is set to {api_origin!r}, which is not a URL. "
+            f"Expected the scheme and host of the relay only, e.g. {DEFAULT_TELEGRAM_API_ORIGIN}."
+        )
+    api_origin = api_origin.rstrip("/")
 
     raw_ids = source.get("OWNER_USER_IDS", "").strip()
     if not raw_ids:
@@ -92,6 +105,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
 
     return Config(
         telegram_bot_token=token,
+        telegram_api_origin=api_origin,
         owner_user_ids=frozenset(owner_user_ids),
         timezone=timezone,
         database_path=Path(database_path),
