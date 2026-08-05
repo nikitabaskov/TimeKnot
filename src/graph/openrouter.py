@@ -14,6 +14,19 @@ MAX_ATTEMPTS = 3
 BACKOFF_BASE_SECONDS = 1.0
 
 
+class ProviderPayloadError(OpenAIError):
+    """A 200 response whose body carries an error instead of a completion.
+
+    OpenRouter answers this way when the upstream provider fails — a rate limit
+    or an outage behind the gateway arrives as `{"error": {"code": 429, ...}}`
+    with no `choices` at all.
+    """
+
+    def __init__(self, message: str, *, status_code: int | None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 def is_retryable(error: OpenAIError) -> bool:
     """Rate limits, timeouts and a provider in trouble pass; a bad request does not.
 
@@ -22,9 +35,26 @@ def is_retryable(error: OpenAIError) -> bool:
     """
     if isinstance(error, APIConnectionError):  # APITimeoutError is a subclass
         return True
+    if isinstance(error, ProviderPayloadError):
+        return error.status_code is None or error.status_code == 429 or error.status_code >= 500
     if isinstance(error, APIStatusError):
         return error.status_code == 429 or error.status_code >= 500
     return False
+
+
+def _payload_error(response: object) -> ProviderPayloadError:
+    """Turn a choice-less response into an error that carries the upstream code."""
+    extra = getattr(response, "model_extra", None) or {}
+    payload = extra.get("error")
+    if not isinstance(payload, dict):
+        return ProviderPayloadError("OpenRouter returned no choices", status_code=None)
+
+    code = payload.get("code")
+    message = payload.get("message") or "no message"
+    return ProviderPayloadError(
+        f"OpenRouter provider error ({code}): {message}",
+        status_code=code if isinstance(code, int) else None,
+    )
 
 
 class OpenRouterClient:
@@ -76,6 +106,8 @@ class OpenRouterClient:
             temperature=0,
             response_format={"type": "json_object"},
         )
+        if not response.choices:
+            raise _payload_error(response)
         content = response.choices[0].message.content
         if not content:
             raise LLMError("OpenRouter returned an empty message")

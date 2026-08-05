@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from openai import APIStatusError, APITimeoutError, OpenAIError
+from openai.types.chat import ChatCompletion
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graph.llm import LLMClient, LLMError, ScriptedLLMClient
@@ -209,6 +210,47 @@ class TestProviderBackoff:
         with pytest.raises(LLMError, match="request failed"):
             await client.complete(system="s", user="u")
         assert slept == []
+
+
+class TestChoicelessResponse:
+    """OpenRouter answers 200 with an `error` body when the provider behind it fails."""
+
+    def client(self, *bodies: dict[str, object]) -> OpenRouterClient:
+        pending = list(bodies)
+
+        async def create(**_: object) -> ChatCompletion:
+            return ChatCompletion.construct(**pending.pop(0))
+
+        async def record(_: float) -> None:
+            return None
+
+        client = OpenRouterClient(
+            api_key="k", model="m", base_url="https://openrouter.test", sleep=record
+        )
+        client._client.chat.completions.create = create  # type: ignore[method-assign]
+        return client
+
+    def completion(self, content: str) -> dict[str, object]:
+        return {"choices": [{"message": {"role": "assistant", "content": content}}]}
+
+    async def test_an_upstream_rate_limit_is_retried_not_crashed(self) -> None:
+        rate_limited = {"error": {"code": 429, "message": "rate-limited upstream"}}
+        client = self.client(rate_limited, self.completion("{}"))
+
+        assert await client.complete(system="s", user="u") == "{}"
+
+    async def test_the_provider_message_reaches_the_log(self) -> None:
+        rejected = {"error": {"code": 402, "message": "not enough credits"}}
+        client = self.client(rejected)
+
+        with pytest.raises(LLMError, match="not enough credits"):
+            await client.complete(system="s", user="u")
+
+    async def test_a_body_without_an_error_is_still_survivable(self) -> None:
+        client = self.client({}, {}, {})
+
+        with pytest.raises(LLMError, match="after 3 attempts"):
+            await client.complete(system="s", user="u")
 
 
 def test_the_horizon_is_measured_from_now() -> None:
