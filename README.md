@@ -1,0 +1,148 @@
+# TimeKnot
+
+A single-user Russian-language Telegram task and reminder assistant. Free-form messages are
+parsed by an LLM into tasks; reminders fire through APScheduler and survive a restart because the
+SQLite `tasks` table, not the scheduler, is the source of truth.
+
+Local development lives in `CLAUDE.md`; this file is about running it on a server.
+
+## Before you start: the bot needs outbound IPv4
+
+`api.telegram.org` publishes **no AAAA record**. On an IPv6-only VPS the bot cannot reach Telegram
+at all, and neither can `git clone` from GitHub, which is also IPv4-only. Check on the server:
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' https://api.telegram.org
+```
+
+`200` (or `302`/`404` — anything but a connection error) means egress works and you can ignore the
+rest of this section. A hang or `Could not resolve host` / `Network is unreachable` means it does
+not. Three ways out, best first:
+
+1. **Buy an IPv4 address from the provider.** Usually a euro or two a month, and nothing else in
+   this document changes.
+2. **Use the provider's NAT64/DNS64**, if it has one. Many IPv6-only plans ship it and only need
+   the resolver set — ask support for the DNS64 address, then put it in
+   `/etc/systemd/resolved.conf` (`DNS=…`) and `systemctl restart systemd-resolved`.
+3. **A public NAT64 resolver**, e.g. `2a01:4f9:c010:3f02::1` (nat64.net). Free and it works, but a
+   stranger's box then sees which hosts you connect to. TLS keeps the token and the messages
+   themselves private; treat this as a stopgap, not a setup.
+
+Everything else the deploy needs — PyPI, OpenRouter, the Debian/Ubuntu mirrors — is reachable over
+IPv6 already.
+
+## First deploy
+
+Sized for the smallest VPS: 1 core, 2 GB RAM, 15 GB disk is far more than this needs.
+
+**1. System packages and the service user.** As root:
+
+```bash
+apt update && apt install -y git curl ca-certificates
+adduser --system --group --no-create-home --home /nonexistent timeknot
+```
+
+**2. `uv`.** The standalone installer pulls the binary from GitHub releases, so it needs the IPv4
+egress from above to be working:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+ln -sf /root/.local/bin/uv /usr/local/bin/uv
+```
+
+**3. The code**, root-owned and read-only to the service:
+
+```bash
+git clone https://github.com/nikitabaskov/TimeKnot.git /opt/timeknot
+cd /opt/timeknot
+uv sync --frozen --no-dev
+```
+
+`uv sync` builds `/opt/timeknot/.venv` and installs the project, which is what puts the
+`timeknot` entry point on disk at `/opt/timeknot/.venv/bin/timeknot`.
+
+**4. The environment file.** Secrets live only here, mode `0600`, outside the repository:
+
+```bash
+install -d -m 0755 /etc/timeknot
+install -m 0600 /opt/timeknot/deploy/timeknot.env.example /etc/timeknot/timeknot.env
+editor /etc/timeknot/timeknot.env
+```
+
+Fill in `TELEGRAM_BOT_TOKEN`, `OWNER_USER_IDS`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and set
+`TIMEZONE` if you are not in Krasnoyarsk. Leave `DATABASE_PATH` pointing at
+`/var/lib/timeknot/timeknot.db`.
+
+**5. The unit:**
+
+```bash
+install -m 0644 /opt/timeknot/deploy/timeknot.service /etc/systemd/system/timeknot.service
+systemctl daemon-reload
+systemctl enable --now timeknot
+systemctl status timeknot
+```
+
+`/var/lib/timeknot` is created by systemd itself (`StateDirectory=`), owned by the service user,
+mode `0700`. The database is the only state; back that one file up and you have backed up
+everything.
+
+## Updating a running instance
+
+```bash
+cd /opt/timeknot
+git pull
+uv sync --frozen --no-dev
+systemctl restart timeknot
+```
+
+The database is untouched — it lives in `/var/lib/timeknot`, not here. Schema changes are applied
+on startup by `create_schema`. Reminders scheduled before the restart are re-armed from the
+database during rehydration, and anything that came due while the process was down is sent
+immediately, marked as late.
+
+To roll back, `git checkout <sha>` and repeat the last two commands.
+
+## Logs
+
+Everything goes to journald under the `timeknot` identifier:
+
+```bash
+journalctl -u timeknot -f              # follow
+journalctl -u timeknot -p warning      # provider failures, failed sends, unusable model output
+journalctl -u timeknot --since '1 hour ago'
+```
+
+Worth recognising:
+
+- `The provider could not be reached` — OpenRouter is down, rate limiting, or the key is wrong.
+  The exception text carries the status code. The owner saw a "модель недоступна" reply.
+- `The model returned unusable output twice` — the retry did not help; the pydantic complaint is
+  in the traceback.
+- `Failed to send reminder for task N` — Telegram refused the send. The task stays unmarked and
+  goes out again on the next dispatch, so this never loses a reminder.
+
+## Verifying by hand after a deploy
+
+1. Write the bot anything — it answers.
+2. `напомни через 2 минуты проверить деплой` — the confirmation shows the local time.
+3. `reboot` the machine before that reminder is due.
+4. After the box comes back, `systemctl status timeknot` is `active (running)` without anyone
+   logging in, and the reminder still arrives with its two buttons.
+5. Press «Отложить на 1 час», then `/tasks` — the new time is there.
+
+Step 3 is the one that matters: it proves both the enable-on-boot and the rehydration path at
+once.
+
+## If GitHub is unreachable and you would rather not fix that
+
+Push the working tree straight from the development machine instead of cloning:
+
+```bash
+rsync -az --delete \
+  --exclude .git --exclude .venv --exclude .scratch \
+  --exclude __pycache__ --exclude '*.db' --exclude .env \
+  ./ root@[<ipv6>]:/opt/timeknot/
+```
+
+Then continue from step 4. `uv sync` still needs PyPI, which is fine over IPv6. Note that this
+leaves the server without a `git pull` path, so every update goes through `rsync` too.

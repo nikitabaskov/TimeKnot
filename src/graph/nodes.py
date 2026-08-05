@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from zoneinfo import ZoneInfo
 
 from langgraph.types import interrupt
@@ -22,6 +23,8 @@ from rendering import (
 from repositories.models import Task, TaskStatus
 from services.matching import find_matches
 from services.tasks import Outcome, TaskService
+
+logger = logging.getLogger(__name__)
 
 UNPARSED_REPLY = "Не смог разобрать сообщение. Попробуй сформулировать иначе."
 LLM_UNAVAILABLE_REPLY = "Сейчас не могу обработать сообщение — модель недоступна. Попробуй позже."
@@ -44,11 +47,15 @@ def make_parse_node(llm: LLMClient, timezone: ZoneInfo):
         try:
             parsed = await extract(llm, text=state["text"], now=state["now"], timezone=timezone)
         except LLMError:
+            # The owner gets a short apology; the operator needs the provider's own words.
+            logger.exception("The provider could not be reached")
             return {"parsed": None, "reply": LLM_UNAVAILABLE_REPLY}
         except DueDateRejected as rejected:
+            logger.info("Refused a due date: %s", rejected)
             return {"parsed": None, "reply": due_date_reply(rejected)}
         except ValidationError:
             # `extract` already spent its one retry; a second failure is honest news.
+            logger.warning("The model returned unusable output twice", exc_info=True)
             return {"parsed": None, "reply": UNPARSED_REPLY}
 
         return {"parsed": parsed}
@@ -88,10 +95,13 @@ def make_clarify_node(llm: LLMClient, timezone: ZoneInfo):
                 timezone=timezone,
             )
         except LLMError:
+            logger.exception("The provider could not be reached while clarifying")
             return {"parsed": None, "clarified": True, "reply": LLM_UNAVAILABLE_REPLY}
         except DueDateRejected as rejected:
+            logger.info("Refused a clarified due date: %s", rejected)
             return {"parsed": None, "clarified": True, "reply": due_date_reply(rejected)}
         except ValidationError:
+            logger.warning("The clarified answer was unusable twice", exc_info=True)
             return {"parsed": None, "clarified": True, "reply": UNPARSED_REPLY}
 
         return {"parsed": clarified, "clarified": True}

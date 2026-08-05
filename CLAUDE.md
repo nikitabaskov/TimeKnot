@@ -8,7 +8,10 @@ task creation, the `dispatch_due` seam firing reminders through APScheduler, reh
 timer cache on startup, the two reminder buttons, the clarifying dialog persisted in
 `AsyncSqliteSaver`, the list / complete / smalltalk branches, and parsing resilience (one retry on
 `ValidationError`, `due_at` sanity checks, exponential backoff on the provider). 120 tests green.
-Next unblocked ticket: `11` (VPS deployment).
+
+Ticket `11` (VPS deployment) is written but not verified: `deploy/timeknot.service`,
+`deploy/timeknot.env.example` and `README.md` are in place, the manual reboot check is still
+pending on the real machine. Next unblocked ticket: `12` (golden set eval).
 
 Every graph branch is real now — no stubs left. Running the bot needs `OPENROUTER_API_KEY` and
 `OPENROUTER_MODEL`. Tests never touch the network: they drive `handle_message` with

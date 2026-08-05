@@ -1,0 +1,48 @@
+[Unit]
+Description=TimeKnot — personal Telegram task and reminder assistant
+Documentation=https://github.com/nikitabaskov/TimeKnot
+After=network-online.target
+Wants=network-online.target
+# A crash loop is almost always a bad config or a dead token. Give up after ten
+# tries so `systemctl status` shows a failed unit instead of restarting forever.
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=timeknot
+Group=timeknot
+WorkingDirectory=/opt/timeknot
+EnvironmentFile=/etc/timeknot/timeknot.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/timeknot/.venv/bin/timeknot
+
+Restart=always
+RestartSec=5s
+
+SyslogIdentifier=timeknot
+StandardOutput=journal
+StandardError=journal
+
+# systemd creates and owns /var/lib/timeknot; DATABASE_PATH points inside it, so
+# the database outlives every code update and every `rm -rf /opt/timeknot`.
+StateDirectory=timeknot
+StateDirectoryMode=0700
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+# /opt/timeknot stays root-owned and read-only to the service: the code the bot
+# runs is not writable by the bot.
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
