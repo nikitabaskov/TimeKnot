@@ -46,9 +46,13 @@ ordinary Bot API server, so long polling, sending and callbacks all work as befo
 ```bash
 cd deploy/worker
 npx wrangler login
+npx wrangler deploy                          # creates the Worker; secrets need it to exist
 npx wrangler secret put TELEGRAM_BOT_TOKEN   # the same token the bot uses
-npx wrangler deploy
 ```
+
+Between those two commands the Worker is up without its secret, which means `env.TELEGRAM_BOT_TOKEN`
+is `undefined`, no path can match it, and every request gets a `404`. The window is safe, not open.
+The secret takes effect as soon as it is set; no second deploy.
 
 `wrangler deploy` prints the URL. Put its origin — scheme and host, no path — into the server
 environment:
