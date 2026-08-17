@@ -4,7 +4,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .env
-*.db
+*.db*
 *.sqlite3
 node_modules/
 .wrangler/
